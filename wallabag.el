@@ -223,6 +223,28 @@ point (if one is found.)"
                (alist-get 'host wallabag-credentials)
                read-url))))
 
+(defun wallabag-archive-entry (id)
+  "mark entry as read."
+  (let* ((token (or (wallabag--get-data "wallabag-token")
+                    (progn (wallabag--create-wallabag-config)
+                           (wallabag--get-data "wallabag-token"))
+                    (error "Could not fetch token")))
+         (wallabag-client (wallabag--make-wallabag-client
+                           (alist-get 'host wallabag-credentials)
+                           (alist-get 'token token)
+                           (alist-get 'refresh-token token)
+                           (alist-get 'expiration-time token)))
+         (response (funcall wallabag-client
+                            "PATCH"
+                            (format "api/entries/%d.json" id)
+                            (wallabag--with-json-preset
+                              (json-encode `((archive . 1))))))
+         (response-data (wallabag--get-json-from-response-buffer response)))
+    
+    (if (not (alist-get 'id response-data))
+        (message "Error while adding article, unable to extract wallabag article id from response: %s"
+                 (with-current-buffer response (buffer-string))))))
+
 (defun wallabag-fetch-org-links ()
   "Fetch list of entries and add them to `org-stored-links'. "
   (interactive)
@@ -237,13 +259,18 @@ point (if one is found.)"
                            (alist-get 'expiration-time token)))
          (response (funcall wallabag-client
                             "GET"
-                            "api/entries.json?tags=org"))
-         (response-data (wallabag--get-json-from-response-buffer response)))
-    
+                            "api/entries.json?tags=org&archive=0v"))
+         (response-data (wallabag--get-json-from-response-buffer response))
+	 (count 0))    
     (dolist (entry (alist-get 'items (alist-get '_embedded response-data)))
       (let ((uri (alist-get 'url entry))
-	    (title (alist-get 'title entry)))
+	    (title (alist-get 'title entry))
+	    (id (alist-get 'id entry)))
 	(when (boundp 'org-stored-links)
-	  (push (list uri title) org-stored-links))))))
+	  (push (list uri title) org-stored-links)
+	  (wallabag-archive-entry id)
+	  (incf count))))
+    (message "Added %d links." count)))
+
 
 (provide 'wallabag)
