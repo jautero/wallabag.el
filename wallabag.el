@@ -259,7 +259,7 @@ point (if one is found.)"
                            (alist-get 'expiration-time token)))
          (response (funcall wallabag-client
                             "GET"
-                            "api/entries.json?tags=org&archive=0v"))
+                            "api/entries.json?tags=org&archive=0"))
          (response-data (wallabag--get-json-from-response-buffer response))
 	 (count 0))    
     (dolist (entry (alist-get 'items (alist-get '_embedded response-data)))
